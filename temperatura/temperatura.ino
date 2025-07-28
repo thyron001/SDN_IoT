@@ -68,8 +68,10 @@ void loop() {
 
   Serial.print("Publicando temperatura: ");
   Serial.println(payload);
-
-  client.publish(topic, payload);
+  
+  unsigned long t_actual = millis();
+  client.publish("sensor/temp", String(t_actual).c_str());
+  // client.publish(topic, payload);
 
   delay(1000); // cada 1 segundo
 }
