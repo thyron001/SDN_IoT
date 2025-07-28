@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <time.h>
 
 // Parámetros WiFi
 const char* ssid     = "RedESP32";
@@ -8,18 +9,22 @@ const char* password = "claveesp32";
 // Parámetros MQTT
 const char* mqtt_server = "192.168.10.169"; // IP de tu PC con Mosquitto
 const int mqtt_port = 1883;
-const char* topic = "sensores/temperatura";
+const char* topic = "sensor/temp"; // Este será usado para la hora
 
 // Cliente WiFi y MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// Función para conectar al WiFi
+// Parámetros NTP
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 0;             // Cambiar según zona horaria si hace falta
+const int daylightOffset_sec = 0;
+
+// Conexión a WiFi
 void setup_wifi() {
   delay(100);
   Serial.print("Conectando a ");
   Serial.println(ssid);
-
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -32,7 +37,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-// Función para reconectar al broker MQTT
+// Conexión MQTT
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Intentando conexión MQTT...");
@@ -47,9 +52,21 @@ void reconnect() {
   }
 }
 
+// Configurar sincronización NTP
+void setupTime() {
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Error al obtener la hora NTP");
+    return;
+  }
+  Serial.println(&timeinfo, "Hora NTP sincronizada: %Y-%m-%d %H:%M:%S");
+}
+
 void setup() {
   Serial.begin(115200);
   setup_wifi();
+  setupTime();
   client.setServer(mqtt_server, mqtt_port);
 }
 
@@ -59,19 +76,17 @@ void loop() {
   }
   client.loop();
 
-  // Temperatura simulada (puedes usar analogRead con sensor real)
-  float temp = 25.0 + random(-10, 10) * 0.1; // simula variación
-
-  // Convertir a string y publicar
-  char payload[20];
-  dtostrf(temp, 4, 2, payload);
-
-  Serial.print("Publicando temperatura: ");
-  Serial.println(payload);
-  
-  unsigned long t_actual = millis();
-  client.publish("sensor/temp", String(t_actual).c_str());
-  // client.publish(topic, payload);
+  // Obtener hora actual en formato string
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    char timestamp[30];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    client.publish(topic, timestamp);
+    Serial.print("Publicando hora: ");
+    Serial.println(timestamp);
+  } else {
+    Serial.println("Error al obtener hora local");
+  }
 
   delay(1000); // cada 1 segundo
 }
