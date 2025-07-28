@@ -1,6 +1,5 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <time.h>
 
 // Parámetros WiFi
 const char* ssid     = "RedESP32";
@@ -9,24 +8,19 @@ const char* password = "claveesp32";
 // Parámetros MQTT
 const char* mqtt_server = "192.168.10.169"; // IP de tu PC con Mosquitto
 const int mqtt_port = 1883;
-const char* topic = "sensor/temp"; // Este será usado para la hora
+const char* topic = "sensor/temp"; // Tópico MQTT
 
 // Cliente WiFi y MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// Parámetros NTP
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;             // Cambiar según zona horaria si hace falta
-const int daylightOffset_sec = 0;
-
-// Conexión a WiFi
+// Conectar a WiFi
 void setup_wifi() {
   delay(100);
   Serial.print("Conectando a ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);
 
+  WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -37,7 +31,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-// Conexión MQTT
+// Reconectar a MQTT si se pierde conexión
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Intentando conexión MQTT...");
@@ -52,21 +46,9 @@ void reconnect() {
   }
 }
 
-// Configurar sincronización NTP
-void setupTime() {
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Error al obtener la hora NTP");
-    return;
-  }
-  Serial.println(&timeinfo, "Hora NTP sincronizada: %Y-%m-%d %H:%M:%S");
-}
-
 void setup() {
   Serial.begin(115200);
   setup_wifi();
-  setupTime();
   client.setServer(mqtt_server, mqtt_port);
 }
 
@@ -76,17 +58,14 @@ void loop() {
   }
   client.loop();
 
-  // Obtener hora actual en formato string
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    char timestamp[30];
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    client.publish(topic, timestamp);
-    Serial.print("Publicando hora: ");
-    Serial.println(timestamp);
-  } else {
-    Serial.println("Error al obtener hora local");
-  }
+  // Publicar millis() como timestamp
+  unsigned long t_actual = millis();
+  char payload[20];
+  sprintf(payload, "%lu", t_actual);
 
-  delay(1000); // cada 1 segundo
+  client.publish(topic, payload);
+  Serial.print("Publicado millis(): ");
+  Serial.println(payload);
+
+  delay(1000); // cada segundo
 }
