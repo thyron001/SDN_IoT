@@ -2,13 +2,19 @@
 #include <PubSubClient.h>
 
 // Parámetros WiFi
-const char* ssid     = "RedESP32";
+const char* ssid     = "s6";
 const char* password = "claveesp32";
 
 // Parámetros MQTT
 const char* mqtt_server = "192.168.10.169"; // IP de tu PC con Mosquitto
 const int mqtt_port = 1883;
-const char* topic = "sensor/temp"; // Tópico MQTT
+const char* topic = "millis"; // Tópico MQTT
+
+// Parámetros de IP estática
+IPAddress local_IP(192, 168, 10, 230);
+IPAddress gateway( 192, 168, 10,   1);
+IPAddress subnet(  255, 255, 255,   0);
+
 
 // Cliente WiFi y MQTT
 WiFiClient espClient;
@@ -19,6 +25,11 @@ void setup_wifi() {
   delay(100);
   Serial.print("Conectando a ");
   Serial.println(ssid);
+
+  // Configura IP estática
+  if (!WiFi.config(local_IP, gateway, subnet)) {
+    Serial.println("Error al configurar IP estática");
+  }
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
